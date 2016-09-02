@@ -14,10 +14,13 @@ namespace WebApp_OpenIDConnect_DotNet_B2C.Controllers
             return View();
         }
 
-        // TODO: Protect this route with the sign in policy
+        // You can use the Authorize decorator to execute a policy if the user is not already signed in the app.
+        [Authorize]
         public ActionResult Claims()
         {
-            // TODO: Extract claims about the user
+            Claim displayName = ClaimsPrincipal.Current.FindFirst(ClaimsPrincipal.Current.Identities.First().NameClaimType);
+            ViewBag.DisplayName = displayName != null ? displayName.Value : string.Empty;
+            return View();
         }
 
         public ActionResult Error(string message)

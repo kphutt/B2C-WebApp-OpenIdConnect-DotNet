@@ -19,8 +19,8 @@ using System.Globalization;
 
 namespace WebApp_OpenIDConnect_DotNet_B2C
 {
-	public partial class Startup
-	{
+    public partial class Startup
+    {
         // App config settings
         private static string clientId = ConfigurationManager.AppSettings["ida:ClientId"];
         private static string aadInstance = ConfigurationManager.AppSettings["ida:AadInstance"];
@@ -35,17 +35,60 @@ namespace WebApp_OpenIDConnect_DotNet_B2C
         public void ConfigureAuth(IAppBuilder app)
         {
             // TODO: Set up authentication for the app
+            app.SetDefaultSignInAsAuthenticationType(CookieAuthenticationDefaults.AuthenticationType);
+
+            app.UseCookieAuthentication(new CookieAuthenticationOptions());
+
+            // Configure OpenID Connect middleware for each policy
+            app.UseOpenIdConnectAuthentication(CreateOptionsFromPolicy(SignUpPolicyId));
+            app.UseOpenIdConnectAuthentication(CreateOptionsFromPolicy(ProfilePolicyId));
+            app.UseOpenIdConnectAuthentication(CreateOptionsFromPolicy(SignInPolicyId));
         }
 
         // Used for avoiding yellow-screen-of-death
         private Task AuthenticationFailed(AuthenticationFailedNotification<OpenIdConnectMessage, OpenIdConnectAuthenticationOptions> notification)
         {
             // TODO: Handle auth failures for the app
+            notification.HandleResponse();
+            if (notification.Exception.Message == "access_denied")
+            {
+                notification.Response.Redirect("/");
+            }
+            else
+            {
+                notification.Response.Redirect("/Home/Error?message=" + notification.Exception.Message);
+            }
+
+            return Task.FromResult(0);
         }
 
         private OpenIdConnectAuthenticationOptions CreateOptionsFromPolicy(string policy)
         {
             // TODO: Use this helper method to set up authentication for the app
+            return new OpenIdConnectAuthenticationOptions
+            {
+                // For each policy, give OWIN the policy-specific metadata address, and
+                // set the authentication type to the id of the policy
+                MetadataAddress = String.Format(aadInstance, tenant, policy),
+                AuthenticationType = policy,
+
+                // These are standard OpenID Connect parameters, with values pulled from web.config
+                ClientId = clientId,
+                RedirectUri = redirectUri,
+                PostLogoutRedirectUri = redirectUri,
+                Notifications = new OpenIdConnectAuthenticationNotifications
+                {
+                    AuthenticationFailed = AuthenticationFailed,
+                },
+                Scope = "openid",
+                ResponseType = "id_token",
+
+                // This piece is optional - it is used for displaying the user's name in the navigation bar.
+                TokenValidationParameters = new TokenValidationParameters
+                {
+                    NameClaimType = "name",
+                },
+            };
         }
     }
 }
